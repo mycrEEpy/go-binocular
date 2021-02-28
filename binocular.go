@@ -114,9 +114,8 @@ func (b *Binocular) Remove(ref interface{}) {
 	}
 }
 
-// Reset recreates the index
-// This will delete the current index
-func (b *Binocular) Reset() {
+// Drop deletes the whole index
+func (b *Binocular) Drop() {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 	b.index = map[string][]interface{}{}

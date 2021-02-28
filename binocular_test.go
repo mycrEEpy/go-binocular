@@ -110,10 +110,10 @@ func TestRemove(t *testing.T) {
 	}
 }
 
-func TestReset(t *testing.T) {
+func TestDrop(t *testing.T) {
 	b := New()
 	b.Index("Some testing data", 1)
-	b.Reset()
+	b.Drop()
 	result := b.Search("testing")
 	if len(result) != 0 {
 		t.Errorf("index should be empty")
