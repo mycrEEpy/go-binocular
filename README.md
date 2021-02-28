@@ -5,6 +5,25 @@
 
 Some sort of in-memory, record-level inverted index 🤷
 
+## Example
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/mycreepy/go-binocular"
+)
+
+func main() {
+	b := binocular.New()
+	b.Index("Always look on the bright side of life", 123)
+	b.Index("Houston we have a problem", 456)
+	result := b.Search("life")
+	fmt.Println(result) // [123]
+}
+```
+
 ## Benchmarks
 
 ```text
