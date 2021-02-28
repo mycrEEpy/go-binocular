@@ -76,6 +76,33 @@ func TestBinocular(t *testing.T) {
 			"mani",
 			1,
 		},
+		{
+			"fuzzy search disabled",
+			[]Option{},
+			[]string{
+				"Can we have a dog please?",
+			},
+			"pls",
+			0,
+		},
+		{
+			"fuzzy search enabled",
+			[]Option{WithFuzzy()},
+			[]string{
+				"Can we have a dog please?",
+			},
+			"pls",
+			1,
+		},
+		{
+			"fuzzy search and stemming enabled",
+			[]Option{WithFuzzy(), WithStemming()},
+			[]string{
+				"Please check all the accumulators",
+			},
+			"accumulator",
+			1,
+		},
 	}
 	for _, td := range testdata {
 		t.Run(td.name, func(t *testing.T) {

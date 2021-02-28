@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/kljensen/snowball"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
 // Binocular has a thread-safe inverted index
@@ -13,6 +14,7 @@ type Binocular struct {
 	index map[string][]interface{}
 
 	stemming        bool
+	fuzzy           bool
 	indexStopWords  bool
 	indexShortWords bool
 }
@@ -35,6 +37,13 @@ func New(options ...Option) *Binocular {
 func WithStemming() Option {
 	return func(b *Binocular) {
 		b.stemming = true
+	}
+}
+
+// WithFuzzy enables fuzzy searches
+func WithFuzzy() Option {
+	return func(b *Binocular) {
+		b.fuzzy = true
 	}
 }
 
@@ -90,6 +99,20 @@ func (b *Binocular) Search(word string) []interface{} {
 	}
 	b.mut.RLock()
 	defer b.mut.RUnlock()
+	if b.fuzzy {
+		var i int
+		wordList := make([]string, len(b.index))
+		for w := range b.index {
+			wordList[i] = w
+			i++
+		}
+		fuzzyRefs := make([]interface{}, 0)
+		fuzzyResult := fuzzy.Find(searchWord, wordList)
+		for _, r := range fuzzyResult {
+			fuzzyRefs = append(fuzzyRefs, b.index[r])
+		}
+		return fuzzyRefs
+	}
 	return b.index[searchWord]
 }
 
