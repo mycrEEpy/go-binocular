@@ -93,11 +93,25 @@ func (b *Binocular) Search(word string) []interface{} {
 	return b.index[searchWord]
 }
 
-// Remove deletes the word from the index
-func (b *Binocular) Remove(word string) {
-	b.mut.Lock()
-	defer b.mut.Unlock()
-	delete(b.index, word)
+// Remove deletes the reference from the index
+func (b *Binocular) Remove(ref interface{}) {
+	for word, refs := range b.index {
+		for i, refInIndex := range refs {
+			if refInIndex == ref {
+				// if it's the last ref just delete the entry
+				if len(refs) == 1 {
+					b.mut.Lock()
+					delete(b.index, word)
+					b.mut.Unlock()
+					continue
+				}
+				// otherwise create a new slice of refs without the given ref
+				b.mut.Lock()
+				b.index[word] = removeElementFromSlice(refs, i)
+				b.mut.Unlock()
+			}
+		}
+	}
 }
 
 // Reset recreates the index
@@ -145,4 +159,11 @@ func stripSpecialChars(s []byte) string {
 		}
 	}
 	return string(s[:j])
+}
+
+// swap the given index with the last element in the slice and drop it
+// copied from https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
+func removeElementFromSlice(s []interface{}, i int) []interface{} {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
 }

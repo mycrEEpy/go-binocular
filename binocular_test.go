@@ -95,14 +95,18 @@ func TestBinocular(t *testing.T) {
 func TestRemove(t *testing.T) {
 	b := New()
 	b.Index("Some testing data", 1)
-	b.Remove("testing")
+	b.Remove(1)
 	r1 := b.Search("testing")
 	if len(r1) != 0 {
 		t.Errorf("result should be empty")
 	}
-	r2 := b.Search("data")
+
+	b.Index("Some testing data", 2)
+	b.Index("Some testing data", 3)
+	b.Remove(2)
+	r2 := b.Search("testing")
 	if len(r2) != 1 {
-		t.Errorf("result should have length of 1")
+		t.Errorf("result should not be empty")
 	}
 }
 
