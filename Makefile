@@ -23,6 +23,9 @@ test: check
 cover: test
 	go tool cover -html coverage.out
 
+bench:
+	go test -v -bench=. -run=^$
+
 tidy:
 	go mod tidy
 

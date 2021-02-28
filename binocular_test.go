@@ -3,6 +3,8 @@ package binocular
 import (
 	"fmt"
 	"testing"
+
+	"github.com/tjarratt/babble"
 )
 
 func TestBinocular(t *testing.T) {
@@ -144,5 +146,150 @@ func TestDrop(t *testing.T) {
 	result := b.Search("testing")
 	if len(result) != 0 {
 		t.Errorf("index should be empty")
+	}
+}
+
+func BenchmarkIndex(b *testing.B) {
+	testdata := []struct {
+		name      string
+		options   []Option
+		wordCount int
+	}{
+		{
+			"basic",
+			[]Option{},
+			10,
+		},
+		{
+			"short sentence",
+			[]Option{},
+			2,
+		},
+		{
+			"stemming",
+			[]Option{WithStemming()},
+			10,
+		},
+		{
+			"index stop words",
+			[]Option{WithIndexStopWords()},
+			10,
+		},
+		{
+			"index short words",
+			[]Option{WithIndexShortWords()},
+			10,
+		},
+		{
+			"all",
+			[]Option{WithStemming(), WithIndexShortWords(), WithIndexStopWords()},
+			10,
+		},
+	}
+	for _, td := range testdata {
+		bin := New(td.options...)
+		babbler := babble.NewBabbler()
+		babbler.Separator = " "
+		babbler.Count = td.wordCount
+		b.Run(td.name, func(b *testing.B) {
+			sentence := babbler.Babble()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				bin.Index(sentence, i)
+			}
+		})
+	}
+}
+
+func BenchmarkSearch(b *testing.B) {
+	testdata := []struct {
+		name      string
+		options   []Option
+		indexSize int
+		wordCount int
+	}{
+		{
+			"basic",
+			[]Option{},
+			1e+6,
+			10,
+		},
+		{
+			"stemming",
+			[]Option{WithStemming()},
+			1e+6,
+			10,
+		},
+		{
+			"fuzzy",
+			[]Option{WithFuzzy()},
+			1e+6,
+			10,
+		},
+		{
+			"all",
+			[]Option{WithStemming(), WithFuzzy()},
+			1e+6,
+			10,
+		},
+	}
+	for _, td := range testdata {
+		b.Run(td.name, func(b *testing.B) {
+			bin := New(td.options...)
+			babbler := babble.NewBabbler()
+			babbler.Separator = " "
+			babbler.Count = td.wordCount
+			for i := 0; i < td.indexSize; i++ {
+				bin.Index(babbler.Babble(), i)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				bin.Search("hello")
+			}
+		})
+	}
+}
+
+func BenchmarkRemove(b *testing.B) {
+	testdata := []struct {
+		name      string
+		indexSize int
+		wordCount int
+	}{
+		{
+			"index size 1e+6",
+			1e+6,
+			10,
+		},
+		{
+			"index size 1e+5",
+			1e+5,
+			10,
+		},
+		{
+			"index size 1e+4",
+			1e+4,
+			10,
+		},
+		{
+			"index size 1e+3",
+			1e+3,
+			10,
+		},
+	}
+	for _, td := range testdata {
+		b.Run(td.name, func(b *testing.B) {
+			bin := New()
+			babbler := babble.NewBabbler()
+			babbler.Separator = " "
+			babbler.Count = td.wordCount
+			for i := 0; i < td.indexSize; i++ {
+				bin.Index(babbler.Babble(), i)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				bin.Remove(b.N)
+			}
+		})
 	}
 }
