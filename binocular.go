@@ -109,7 +109,7 @@ func (b *Binocular) Search(word string) []interface{} {
 		fuzzyRefs := make([]interface{}, 0)
 		fuzzyResult := fuzzy.Find(searchWord, wordList)
 		for _, r := range fuzzyResult {
-			fuzzyRefs = append(fuzzyRefs, b.index[r])
+			fuzzyRefs = append(fuzzyRefs, b.index[r]...)
 		}
 		return fuzzyRefs
 	}
