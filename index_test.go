@@ -7,7 +7,7 @@ import (
 	"github.com/tjarratt/babble"
 )
 
-func TestIndex_PutAndSearch(t *testing.T) {
+func TestIndex_AddAndSearch(t *testing.T) {
 	testdata := []struct {
 		name      string
 		options   []IndexOption
@@ -121,7 +121,7 @@ func TestIndex_PutAndSearch(t *testing.T) {
 		t.Run(td.name, func(t *testing.T) {
 			index := NewIndex(td.options...)
 			for i, v := range td.indexData {
-				index.Put(v, i)
+				index.Add(v, i)
 			}
 			var result []interface{}
 			if td.distance > 0 {
@@ -139,15 +139,15 @@ func TestIndex_PutAndSearch(t *testing.T) {
 
 func TestIndex_Remove(t *testing.T) {
 	index := NewIndex()
-	index.Put("Some testing data", 1)
+	index.Add("Some testing data", 1)
 	index.Remove(1)
 	r1 := index.Search("testing")
 	if len(r1) != 0 {
 		t.Errorf("result should be empty")
 	}
 
-	index.Put("Some testing data", 2)
-	index.Put("Some testing data", 3)
+	index.Add("Some testing data", 2)
+	index.Add("Some testing data", 3)
 	index.Remove(2)
 	r2 := index.Search("testing")
 	if len(r2) != 1 {
@@ -157,7 +157,7 @@ func TestIndex_Remove(t *testing.T) {
 
 func TestIndex_Drop(t *testing.T) {
 	index := NewIndex()
-	index.Put("Some testing data", 1)
+	index.Add("Some testing data", 1)
 	index.Drop()
 	result := index.Search("testing")
 	if len(result) != 0 {
@@ -165,7 +165,7 @@ func TestIndex_Drop(t *testing.T) {
 	}
 }
 
-func BenchmarkIndex_Put(b *testing.B) {
+func BenchmarkIndex_Add(b *testing.B) {
 	testdata := []struct {
 		name      string
 		options   []IndexOption
@@ -211,7 +211,7 @@ func BenchmarkIndex_Put(b *testing.B) {
 			sentence := babbler.Babble()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				index.Put(sentence, i)
+				index.Add(sentence, i)
 			}
 		})
 	}
@@ -244,7 +244,7 @@ func BenchmarkIndex_Search(b *testing.B) {
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				index.Put(babbler.Babble(), i)
+				index.Add(babbler.Babble(), i)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -284,7 +284,7 @@ func BenchmarkIndex_FuzzySearch(b *testing.B) {
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				index.Put(babbler.Babble(), i)
+				index.Add(babbler.Babble(), i)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -328,7 +328,7 @@ func BenchmarkIndex_Remove(b *testing.B) {
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				index.Put(babbler.Babble(), i)
+				index.Add(babbler.Babble(), i)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {

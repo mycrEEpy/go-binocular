@@ -54,8 +54,8 @@ func WithShortWords() IndexOption {
 	}
 }
 
-// Put splits the given sentence into words and adds them with the reference to the data map.
-func (index *Index) Put(sentence string, ref interface{}) {
+// Add splits the given sentence into words and adds them with the reference to the data map.
+func (index *Index) Add(sentence string, ref interface{}) {
 	for _, word := range strings.Split(sentence, " ") {
 		word = stripSpecialChars([]byte(word))
 		if index.stemming {
