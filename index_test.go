@@ -7,18 +7,18 @@ import (
 	"github.com/tjarratt/babble"
 )
 
-func TestIndexAndSearch(t *testing.T) {
+func TestIndex_PutAndSearch(t *testing.T) {
 	testdata := []struct {
-		name     string
-		options  []Option
-		index    []string
-		search   string
-		distance int
-		lenRefs  int
+		name      string
+		options   []IndexOption
+		indexData []string
+		search    string
+		distance  int
+		lenRefs   int
 	}{
 		{
 			"basic",
-			[]Option{},
+			[]IndexOption{},
 			[]string{
 				"Basic testing",
 			},
@@ -28,7 +28,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"stop word disabled",
-			[]Option{},
+			[]IndexOption{},
 			[]string{
 				"So testing some stop words",
 			},
@@ -38,7 +38,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"stop word enabled",
-			[]Option{WithIndexStopWords()},
+			[]IndexOption{WithStopWords()},
 			[]string{
 				"So testing some stop words",
 			},
@@ -48,7 +48,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"short stop word enabled",
-			[]Option{WithIndexStopWords(), WithIndexShortWords()},
+			[]IndexOption{WithStopWords(), WithShortWords()},
 			[]string{
 				"So testing some stop words",
 			},
@@ -58,7 +58,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"stemming enabled",
-			[]Option{WithStemming()},
+			[]IndexOption{WithStemming()},
 			[]string{
 				"There are too many cats!",
 			},
@@ -68,7 +68,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"stemming enabled with simplification",
-			[]Option{WithStemming()},
+			[]IndexOption{WithStemming()},
 			[]string{
 				"There are too many cats!",
 			},
@@ -78,7 +78,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"stemming enabled with simplification as input",
-			[]Option{WithStemming()},
+			[]IndexOption{WithStemming()},
 			[]string{
 				"There are too many cats!",
 			},
@@ -88,7 +88,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"fuzzy search disabled",
-			[]Option{},
+			[]IndexOption{},
 			[]string{
 				"Can we have a dog please?",
 			},
@@ -98,7 +98,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"fuzzy search enabled",
-			[]Option{},
+			[]IndexOption{},
 			[]string{
 				"Can we have a dog please?",
 			},
@@ -108,7 +108,7 @@ func TestIndexAndSearch(t *testing.T) {
 		},
 		{
 			"fuzzy search and stemming enabled",
-			[]Option{WithStemming()},
+			[]IndexOption{WithStemming()},
 			[]string{
 				"Please check all the accumulators",
 			},
@@ -119,15 +119,15 @@ func TestIndexAndSearch(t *testing.T) {
 	}
 	for _, td := range testdata {
 		t.Run(td.name, func(t *testing.T) {
-			b := New(td.options...)
-			for i, v := range td.index {
-				b.Index(v, i)
+			index := NewIndex(td.options...)
+			for i, v := range td.indexData {
+				index.Put(v, i)
 			}
 			var result []interface{}
 			if td.distance > 0 {
-				result = b.FuzzySearch(td.search, td.distance)
+				result = index.FuzzySearch(td.search, td.distance)
 			} else {
-				result = b.Search(td.search)
+				result = index.Search(td.search)
 			}
 			if len(result) != td.lenRefs {
 				t.Errorf("expected %d, got %d", td.lenRefs, len(result))
@@ -137,73 +137,73 @@ func TestIndexAndSearch(t *testing.T) {
 	}
 }
 
-func TestRemove(t *testing.T) {
-	b := New()
-	b.Index("Some testing data", 1)
-	b.Remove(1)
-	r1 := b.Search("testing")
+func TestIndex_Remove(t *testing.T) {
+	index := NewIndex()
+	index.Put("Some testing data", 1)
+	index.Remove(1)
+	r1 := index.Search("testing")
 	if len(r1) != 0 {
 		t.Errorf("result should be empty")
 	}
 
-	b.Index("Some testing data", 2)
-	b.Index("Some testing data", 3)
-	b.Remove(2)
-	r2 := b.Search("testing")
+	index.Put("Some testing data", 2)
+	index.Put("Some testing data", 3)
+	index.Remove(2)
+	r2 := index.Search("testing")
 	if len(r2) != 1 {
 		t.Errorf("result should not be empty")
 	}
 }
 
-func TestDrop(t *testing.T) {
-	b := New()
-	b.Index("Some testing data", 1)
-	b.Drop()
-	result := b.Search("testing")
+func TestIndex_Drop(t *testing.T) {
+	index := NewIndex()
+	index.Put("Some testing data", 1)
+	index.Drop()
+	result := index.Search("testing")
 	if len(result) != 0 {
-		t.Errorf("index should be empty")
+		t.Errorf("data should be empty")
 	}
 }
 
-func BenchmarkIndex(b *testing.B) {
+func BenchmarkIndex_Put(b *testing.B) {
 	testdata := []struct {
 		name      string
-		options   []Option
+		options   []IndexOption
 		wordCount int
 	}{
 		{
 			"basic",
-			[]Option{},
+			[]IndexOption{},
 			10,
 		},
 		{
 			"short sentence",
-			[]Option{},
+			[]IndexOption{},
 			2,
 		},
 		{
 			"stemming",
-			[]Option{WithStemming()},
+			[]IndexOption{WithStemming()},
 			10,
 		},
 		{
-			"index stop words",
-			[]Option{WithIndexStopWords()},
+			"data stop words",
+			[]IndexOption{WithStopWords()},
 			10,
 		},
 		{
-			"index short words",
-			[]Option{WithIndexShortWords()},
+			"data short words",
+			[]IndexOption{WithShortWords()},
 			10,
 		},
 		{
 			"all",
-			[]Option{WithStemming(), WithIndexShortWords(), WithIndexStopWords()},
+			[]IndexOption{WithStemming(), WithShortWords(), WithStopWords()},
 			10,
 		},
 	}
 	for _, td := range testdata {
-		bin := New(td.options...)
+		index := NewIndex(td.options...)
 		babbler := babble.NewBabbler()
 		babbler.Separator = " "
 		babbler.Count = td.wordCount
@@ -211,67 +211,67 @@ func BenchmarkIndex(b *testing.B) {
 			sentence := babbler.Babble()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				bin.Index(sentence, i)
+				index.Put(sentence, i)
 			}
 		})
 	}
 }
 
-func BenchmarkSearch(b *testing.B) {
+func BenchmarkIndex_Search(b *testing.B) {
 	testdata := []struct {
 		name      string
-		options   []Option
+		options   []IndexOption
 		indexSize int
 		wordCount int
 	}{
 		{
 			"basic",
-			[]Option{},
+			[]IndexOption{},
 			1e+6,
 			10,
 		},
 		{
 			"stemming",
-			[]Option{WithStemming()},
+			[]IndexOption{WithStemming()},
 			1e+6,
 			10,
 		},
 	}
 	for _, td := range testdata {
 		b.Run(td.name, func(b *testing.B) {
-			bin := New(td.options...)
+			index := NewIndex(td.options...)
 			babbler := babble.NewBabbler()
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				bin.Index(babbler.Babble(), i)
+				index.Put(babbler.Babble(), i)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				bin.Search("hello")
+				index.Search("hello")
 			}
 		})
 	}
 }
 
-func BenchmarkFuzzySearch(b *testing.B) {
+func BenchmarkIndex_FuzzySearch(b *testing.B) {
 	testdata := []struct {
 		name      string
-		options   []Option
+		options   []IndexOption
 		distance  int
 		indexSize int
 		wordCount int
 	}{
 		{
 			"basic",
-			[]Option{},
+			[]IndexOption{},
 			5,
 			1e+6,
 			10,
 		},
 		{
 			"stemming",
-			[]Option{WithStemming()},
+			[]IndexOption{WithStemming()},
 			5,
 			1e+6,
 			10,
@@ -279,60 +279,60 @@ func BenchmarkFuzzySearch(b *testing.B) {
 	}
 	for _, td := range testdata {
 		b.Run(td.name, func(b *testing.B) {
-			bin := New(td.options...)
+			index := NewIndex(td.options...)
 			babbler := babble.NewBabbler()
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				bin.Index(babbler.Babble(), i)
+				index.Put(babbler.Babble(), i)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				bin.FuzzySearch("hello", td.distance)
+				index.FuzzySearch("hello", td.distance)
 			}
 		})
 	}
 }
 
-func BenchmarkRemove(b *testing.B) {
+func BenchmarkIndex_Remove(b *testing.B) {
 	testdata := []struct {
 		name      string
 		indexSize int
 		wordCount int
 	}{
 		{
-			"index size 1e+6",
+			"data size 1e+6",
 			1e+6,
 			10,
 		},
 		{
-			"index size 1e+5",
+			"data size 1e+5",
 			1e+5,
 			10,
 		},
 		{
-			"index size 1e+4",
+			"data size 1e+4",
 			1e+4,
 			10,
 		},
 		{
-			"index size 1e+3",
+			"data size 1e+3",
 			1e+3,
 			10,
 		},
 	}
 	for _, td := range testdata {
 		b.Run(td.name, func(b *testing.B) {
-			bin := New()
+			index := NewIndex()
 			babbler := babble.NewBabbler()
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				bin.Index(babbler.Babble(), i)
+				index.Put(babbler.Babble(), i)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				bin.Remove(b.N)
+				index.Remove(b.N)
 			}
 		})
 	}

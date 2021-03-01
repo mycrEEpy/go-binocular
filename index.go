@@ -8,110 +8,110 @@ import (
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
-// Binocular has a thread-safe inverted index
-type Binocular struct {
-	mut   sync.RWMutex
-	index map[string][]interface{}
+// Index is aa thread-safe inverted data.
+type Index struct {
+	mut  sync.RWMutex
+	data map[string][]interface{}
 
-	stemming        bool
-	indexStopWords  bool
-	indexShortWords bool
+	stemming       bool
+	keepStopWords  bool
+	keepShortWords bool
 }
 
-// Option alters the behavior of a Binocular
-type Option func(b *Binocular)
+// IndexOption alters the indexing behavior of an Index.
+type IndexOption func(index *Index)
 
-// New creates a new Binocular with the given Options
-func New(options ...Option) *Binocular {
-	b := &Binocular{
-		index: map[string][]interface{}{},
+// NewIndex creates a new Index with the given Options.
+func NewIndex(options ...IndexOption) *Index {
+	index := &Index{
+		data: map[string][]interface{}{},
 	}
 	for _, opt := range options {
-		opt(b)
+		opt(index)
 	}
-	return b
+	return index
 }
 
-// WithStemming enables word stemming when calling Binocular.Index
-func WithStemming() Option {
-	return func(b *Binocular) {
-		b.stemming = true
-	}
-}
-
-// WithIndexStopWords enables indexing of stop words
-func WithIndexStopWords() Option {
-	return func(b *Binocular) {
-		b.indexStopWords = true
+// WithStemming enables word stemming when reading and writing data to the Index.
+func WithStemming() IndexOption {
+	return func(index *Index) {
+		index.stemming = true
 	}
 }
 
-// WithIndexShortWords enables indexing of short words
-// This will have no effect if WithStemming is also enabled
-func WithIndexShortWords() Option {
-	return func(b *Binocular) {
-		b.indexShortWords = true
+// WithStopWords enables indexing of stop words.
+func WithStopWords() IndexOption {
+	return func(index *Index) {
+		index.keepStopWords = true
 	}
 }
 
-// Index splits the given sentence into words and adds them with the reference to the index
-func (b *Binocular) Index(sentence string, ref interface{}) {
+// WithShortWords enables indexing of short words.
+// This will have no effect if WithStemming is also enabled.
+func WithShortWords() IndexOption {
+	return func(index *Index) {
+		index.keepShortWords = true
+	}
+}
+
+// Put splits the given sentence into words and adds them with the reference to the data map
+func (index *Index) Put(sentence string, ref interface{}) {
 	for _, word := range strings.Split(sentence, " ") {
 		word = stripSpecialChars([]byte(word))
-		if b.stemming {
-			stemmed, err := snowball.Stem(word, "english", b.indexStopWords)
+		if index.stemming {
+			stemmed, err := snowball.Stem(word, "english", index.keepStopWords)
 			if err == nil {
-				b.mut.Lock()
-				b.index[stemmed] = append(b.index[stemmed], ref)
-				b.mut.Unlock()
+				index.mut.Lock()
+				index.data[stemmed] = append(index.data[stemmed], ref)
+				index.mut.Unlock()
 				continue
 			}
 		}
 		wordLower := strings.ToLower(word)
-		if !b.indexShortWords && len(wordLower) <= 2 {
+		if !index.keepShortWords && len(wordLower) <= 2 {
 			continue
 		}
-		if !b.indexStopWords && isStopWord(wordLower) {
+		if !index.keepStopWords && isStopWord(wordLower) {
 			continue
 		}
-		b.mut.Lock()
-		b.index[wordLower] = append(b.index[wordLower], ref)
-		b.mut.Unlock()
+		index.mut.Lock()
+		index.data[wordLower] = append(index.data[wordLower], ref)
+		index.mut.Unlock()
 	}
 }
 
 // Search returns a slice of references found for the given word
-func (b *Binocular) Search(word string) []interface{} {
+func (index *Index) Search(word string) []interface{} {
 	searchWord := strings.ToLower(word)
-	if b.stemming {
-		stemmed, err := snowball.Stem(searchWord, "english", b.indexStopWords)
+	if index.stemming {
+		stemmed, err := snowball.Stem(searchWord, "english", index.keepStopWords)
 		if err == nil {
 			searchWord = stemmed
 		}
 	}
-	b.mut.RLock()
-	defer b.mut.RUnlock()
-	return b.index[searchWord]
+	index.mut.RLock()
+	defer index.mut.RUnlock()
+	return index.data[searchWord]
 }
 
-// FuzzySearch returns a slice of references found for the given word
-// distance is the Levenshtein distance and should be > 0
-func (b *Binocular) FuzzySearch(word string, distance int) []interface{} {
+// FuzzySearch returns a slice of references found for the given word.
+// Distance is the Levenshtein distance and should be > 0.
+func (index *Index) FuzzySearch(word string, distance int) []interface{} {
 	if distance <= 0 {
-		return b.Search(word)
+		return index.Search(word)
 	}
 
 	searchWord := strings.ToLower(word)
-	if b.stemming {
-		stemmed, err := snowball.Stem(searchWord, "english", b.indexStopWords)
+	if index.stemming {
+		stemmed, err := snowball.Stem(searchWord, "english", index.keepStopWords)
 		if err == nil {
 			searchWord = stemmed
 		}
 	}
-	b.mut.RLock()
-	defer b.mut.RUnlock()
+	index.mut.RLock()
+	defer index.mut.RUnlock()
 	refs := make([]interface{}, 0)
-	for k, v := range b.index {
+	for k, v := range index.data {
 		d := fuzzy.RankMatch(searchWord, k)
 		if d > -1 && d <= distance {
 			refs = append(refs, v...)
@@ -120,32 +120,32 @@ func (b *Binocular) FuzzySearch(word string, distance int) []interface{} {
 	return refs
 }
 
-// Remove deletes the reference from the index
-func (b *Binocular) Remove(ref interface{}) {
-	for word, refs := range b.index {
+// Remove deletes the reference from the Index
+func (index *Index) Remove(ref interface{}) {
+	for word, refs := range index.data {
 		for i, refInIndex := range refs {
 			if refInIndex == ref {
 				// if it's the last ref just delete the entry
 				if len(refs) == 1 {
-					b.mut.Lock()
-					delete(b.index, word)
-					b.mut.Unlock()
+					index.mut.Lock()
+					delete(index.data, word)
+					index.mut.Unlock()
 					continue
 				}
 				// otherwise create a new slice of refs without the given ref
-				b.mut.Lock()
-				b.index[word] = removeElementFromSlice(refs, i)
-				b.mut.Unlock()
+				index.mut.Lock()
+				index.data[word] = removeElementFromSlice(refs, i)
+				index.mut.Unlock()
 			}
 		}
 	}
 }
 
-// Drop deletes the whole index
-func (b *Binocular) Drop() {
-	b.mut.Lock()
-	defer b.mut.Unlock()
-	b.index = map[string][]interface{}{}
+// Drop deletes the indexed data
+func (index *Index) Drop() {
+	index.mut.Lock()
+	defer index.mut.Unlock()
+	index.data = map[string][]interface{}{}
 }
 
 // copied from snowball package as it's unexported
@@ -187,7 +187,7 @@ func stripSpecialChars(s []byte) string {
 	return string(s[:j])
 }
 
-// swap the given index with the last element in the slice and drop it
+// swap the given data with the last element in the slice and drop it
 // copied from https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 func removeElementFromSlice(s []interface{}, i int) []interface{} {
 	s[len(s)-1], s[i] = s[i], s[len(s)-1]
