@@ -8,7 +8,7 @@ import (
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
-// Index is aa thread-safe inverted data.
+// Index is a thread-safe inverted index.
 type Index struct {
 	mut  sync.RWMutex
 	data map[string][]interface{}
@@ -54,7 +54,7 @@ func WithShortWords() IndexOption {
 	}
 }
 
-// Put splits the given sentence into words and adds them with the reference to the data map
+// Put splits the given sentence into words and adds them with the reference to the data map.
 func (index *Index) Put(sentence string, ref interface{}) {
 	for _, word := range strings.Split(sentence, " ") {
 		word = stripSpecialChars([]byte(word))
@@ -80,7 +80,7 @@ func (index *Index) Put(sentence string, ref interface{}) {
 	}
 }
 
-// Search returns a slice of references found for the given word
+// Search returns a slice of references found for the given word.
 func (index *Index) Search(word string) []interface{} {
 	searchWord := strings.ToLower(word)
 	if index.stemming {
@@ -120,7 +120,7 @@ func (index *Index) FuzzySearch(word string, distance int) []interface{} {
 	return refs
 }
 
-// Remove deletes the reference from the Index
+// Remove deletes the reference from the Index.
 func (index *Index) Remove(ref interface{}) {
 	for word, refs := range index.data {
 		for i, refInIndex := range refs {
@@ -141,7 +141,7 @@ func (index *Index) Remove(ref interface{}) {
 	}
 }
 
-// Drop deletes the indexed data
+// Drop deletes the indexed data.
 func (index *Index) Drop() {
 	index.mut.Lock()
 	defer index.mut.Unlock()
