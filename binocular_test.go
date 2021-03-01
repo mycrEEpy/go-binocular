@@ -89,7 +89,7 @@ func TestBinocular(t *testing.T) {
 		},
 		{
 			"fuzzy search enabled",
-			[]Option{WithFuzzy()},
+			[]Option{WithFuzzy(5)},
 			[]string{
 				"Can we have a dog please?",
 			},
@@ -98,7 +98,7 @@ func TestBinocular(t *testing.T) {
 		},
 		{
 			"fuzzy search and stemming enabled",
-			[]Option{WithFuzzy(), WithStemming()},
+			[]Option{WithFuzzy(5), WithStemming()},
 			[]string{
 				"Please check all the accumulators",
 			},
@@ -222,13 +222,13 @@ func BenchmarkSearch(b *testing.B) {
 		},
 		{
 			"fuzzy",
-			[]Option{WithFuzzy()},
+			[]Option{WithFuzzy(5)},
 			1e+6,
 			10,
 		},
 		{
 			"all",
-			[]Option{WithStemming(), WithFuzzy()},
+			[]Option{WithStemming(), WithFuzzy(5)},
 			1e+6,
 			10,
 		},
