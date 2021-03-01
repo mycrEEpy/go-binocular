@@ -16,10 +16,10 @@ import (
 )
 
 func main() {
-	b := binocular.New()
-	b.Index("Always look on the bright side of life", 123)
-	b.Index("Houston we have a problem", 456)
-	result := b.Search("life")
+	index := binocular.NewIndex()
+	index.Put("Always look on the bright side of life", 123)
+	index.Put("Houston we have a problem", 456)
+	result := index.Search("life")
 	fmt.Println(result) // [123]
 }
 ```
