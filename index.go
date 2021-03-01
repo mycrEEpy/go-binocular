@@ -80,8 +80,8 @@ func (index *Index) Add(sentence string, ref interface{}) {
 	}
 }
 
-// Search returns a slice of references found for the given word.
-func (index *Index) Search(word string) []interface{} {
+// search returns a slice of references found for the given word.
+func (index *Index) search(word string) []interface{} {
 	searchWord := strings.ToLower(word)
 	if index.stemming {
 		stemmed, err := snowball.Stem(searchWord, "english", index.keepStopWords)
@@ -94,11 +94,11 @@ func (index *Index) Search(word string) []interface{} {
 	return index.data[searchWord]
 }
 
-// FuzzySearch returns a slice of references found for the given word.
-// Distance is the Levenshtein distance and should be > 0.
-func (index *Index) FuzzySearch(word string, distance int) []interface{} {
+// Search returns a slice of references found for the given word.
+// Distance is the Levenshtein distance.
+func (index *Index) Search(word string, distance int) []interface{} {
 	if distance <= 0 {
-		return index.Search(word)
+		return index.search(word)
 	}
 
 	searchWord := strings.ToLower(word)

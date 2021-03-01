@@ -3,6 +3,8 @@ module github.com/mycreepy/go-binocular
 go 1.16
 
 require (
+	github.com/fatih/structtag v1.2.0
+	github.com/google/uuid v1.2.0
 	github.com/kljensen/snowball v0.6.0
 	github.com/lithammer/fuzzysearch v1.1.1
 	github.com/onsi/ginkgo v1.15.0 // indirect
