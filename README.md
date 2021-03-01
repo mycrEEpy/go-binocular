@@ -34,35 +34,36 @@ pkg: github.com/mycreepy/go-binocular
 cpu: Intel(R) Core(TM) i7-6820HQ CPU @ 2.70GHz
 BenchmarkIndex
 BenchmarkIndex/basic
-BenchmarkIndex/basic-8         	                  591122	      2158 ns/op
+BenchmarkIndex/basic-8   	                  526098	      2530 ns/op
 BenchmarkIndex/short_sentence
-BenchmarkIndex/short_sentence-8         	 2605183	     477.5 ns/op
+BenchmarkIndex/short_sentence-8         	 2106877	     578.6 ns/op
 BenchmarkIndex/stemming
-BenchmarkIndex/stemming-8               	   32940	     34007 ns/op
+BenchmarkIndex/stemming-8               	   25466	     45394 ns/op
 BenchmarkIndex/index_stop_words
-BenchmarkIndex/index_stop_words-8       	  639454	      1962 ns/op
+BenchmarkIndex/index_stop_words-8       	  494758	      2308 ns/op
 BenchmarkIndex/index_short_words
-BenchmarkIndex/index_short_words-8      	  617394	      1881 ns/op
+BenchmarkIndex/index_short_words-8      	  468702	      2550 ns/op
 BenchmarkIndex/all
-BenchmarkIndex/all-8                    	   34707	     35180 ns/op
+BenchmarkIndex/all-8                    	   28339	     44917 ns/op
 BenchmarkSearch
 BenchmarkSearch/basic
-BenchmarkSearch/basic-8                 	31879255	     37.43 ns/op
+BenchmarkSearch/basic-8                 	22643508	     48.56 ns/op
 BenchmarkSearch/stemming
-BenchmarkSearch/stemming-8              	  387381	      3409 ns/op
-BenchmarkSearch/fuzzy
-BenchmarkSearch/fuzzy-8                 	      52	  30109980 ns/op
-BenchmarkSearch/all
-BenchmarkSearch/all-8                   	     100	  18037148 ns/op
+BenchmarkSearch/stemming-8              	  315206	      4089 ns/op
+BenchmarkFuzzySearch
+BenchmarkFuzzySearch/basic
+BenchmarkFuzzySearch/basic-8            	      42	  39916250 ns/op
+BenchmarkFuzzySearch/stemming
+BenchmarkFuzzySearch/stemming-8         	     100	  17308908 ns/op
 BenchmarkRemove
 BenchmarkRemove/index_size_1e+6
-BenchmarkRemove/index_size_1e+6-8       	       3	 360625101 ns/op
+BenchmarkRemove/index_size_1e+6-8       	       3	 421132080 ns/op
 BenchmarkRemove/index_size_1e+5
-BenchmarkRemove/index_size_1e+5-8       	      39	  33768126 ns/op
+BenchmarkRemove/index_size_1e+5-8       	      28	  45965739 ns/op
 BenchmarkRemove/index_size_1e+4
-BenchmarkRemove/index_size_1e+4-8       	     304	   4012673 ns/op
+BenchmarkRemove/index_size_1e+4-8       	     204	   5386136 ns/op
 BenchmarkRemove/index_size_1e+3
-BenchmarkRemove/index_size_1e+3-8       	    4255	    261944 ns/op
+BenchmarkRemove/index_size_1e+3-8       	    3774	    314521 ns/op
 PASS
-ok  	github.com/mycreepy/go-binocular	345.043s
+ok  	github.com/mycreepy/go-binocular	423.974s
 ```

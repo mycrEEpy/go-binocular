@@ -14,7 +14,6 @@ type Binocular struct {
 	index map[string][]interface{}
 
 	stemming        bool
-	fuzzyDistance   int
 	indexStopWords  bool
 	indexShortWords bool
 }
@@ -37,13 +36,6 @@ func New(options ...Option) *Binocular {
 func WithStemming() Option {
 	return func(b *Binocular) {
 		b.stemming = true
-	}
-}
-
-// WithFuzzy enables fuzzy searches
-func WithFuzzy(distance int) Option {
-	return func(b *Binocular) {
-		b.fuzzyDistance = distance
 	}
 }
 
@@ -99,17 +91,33 @@ func (b *Binocular) Search(word string) []interface{} {
 	}
 	b.mut.RLock()
 	defer b.mut.RUnlock()
-	if b.fuzzyDistance > 0 {
-		fuzzyRefs := make([]interface{}, 0)
-		for k, v := range b.index {
-			d := fuzzy.RankMatch(searchWord, k)
-			if d > -1 && d <= b.fuzzyDistance {
-				fuzzyRefs = append(fuzzyRefs, v...)
-			}
-		}
-		return fuzzyRefs
-	}
 	return b.index[searchWord]
+}
+
+// FuzzySearch returns a slice of references found for the given word
+// distance is the Levenshtein distance and should be > 0
+func (b *Binocular) FuzzySearch(word string, distance int) []interface{} {
+	if distance <= 0 {
+		return b.Search(word)
+	}
+
+	searchWord := strings.ToLower(word)
+	if b.stemming {
+		stemmed, err := snowball.Stem(searchWord, "english", b.indexStopWords)
+		if err == nil {
+			searchWord = stemmed
+		}
+	}
+	b.mut.RLock()
+	defer b.mut.RUnlock()
+	refs := make([]interface{}, 0)
+	for k, v := range b.index {
+		d := fuzzy.RankMatch(searchWord, k)
+		if d > -1 && d <= distance {
+			refs = append(refs, v...)
+		}
+	}
+	return refs
 }
 
 // Remove deletes the reference from the index

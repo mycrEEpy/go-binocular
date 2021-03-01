@@ -7,13 +7,14 @@ import (
 	"github.com/tjarratt/babble"
 )
 
-func TestBinocular(t *testing.T) {
+func TestIndexAndSearch(t *testing.T) {
 	testdata := []struct {
-		name    string
-		options []Option
-		index   []string
-		search  string
-		lenRefs int
+		name     string
+		options  []Option
+		index    []string
+		search   string
+		distance int
+		lenRefs  int
 	}{
 		{
 			"basic",
@@ -22,6 +23,7 @@ func TestBinocular(t *testing.T) {
 				"Basic testing",
 			},
 			"testing",
+			0,
 			1,
 		},
 		{
@@ -32,6 +34,7 @@ func TestBinocular(t *testing.T) {
 			},
 			"some",
 			0,
+			0,
 		},
 		{
 			"stop word enabled",
@@ -40,6 +43,7 @@ func TestBinocular(t *testing.T) {
 				"So testing some stop words",
 			},
 			"some",
+			0,
 			1,
 		},
 		{
@@ -49,6 +53,7 @@ func TestBinocular(t *testing.T) {
 				"So testing some stop words",
 			},
 			"so",
+			0,
 			1,
 		},
 		{
@@ -58,6 +63,7 @@ func TestBinocular(t *testing.T) {
 				"There are too many cats!",
 			},
 			"cat",
+			0,
 			1,
 		},
 		{
@@ -67,6 +73,7 @@ func TestBinocular(t *testing.T) {
 				"There are too many cats!",
 			},
 			"many",
+			0,
 			1,
 		},
 		{
@@ -76,6 +83,7 @@ func TestBinocular(t *testing.T) {
 				"There are too many cats!",
 			},
 			"mani",
+			0,
 			1,
 		},
 		{
@@ -86,23 +94,26 @@ func TestBinocular(t *testing.T) {
 			},
 			"pls",
 			0,
+			0,
 		},
 		{
 			"fuzzy search enabled",
-			[]Option{WithFuzzy(5)},
+			[]Option{},
 			[]string{
 				"Can we have a dog please?",
 			},
 			"pls",
+			5,
 			1,
 		},
 		{
 			"fuzzy search and stemming enabled",
-			[]Option{WithFuzzy(5), WithStemming()},
+			[]Option{WithStemming()},
 			[]string{
 				"Please check all the accumulators",
 			},
 			"accumulator",
+			5,
 			1,
 		},
 	}
@@ -112,7 +123,12 @@ func TestBinocular(t *testing.T) {
 			for i, v := range td.index {
 				b.Index(v, i)
 			}
-			result := b.Search(td.search)
+			var result []interface{}
+			if td.distance > 0 {
+				result = b.FuzzySearch(td.search, td.distance)
+			} else {
+				result = b.Search(td.search)
+			}
 			if len(result) != td.lenRefs {
 				t.Errorf("expected %d, got %d", td.lenRefs, len(result))
 			}
@@ -220,15 +236,43 @@ func BenchmarkSearch(b *testing.B) {
 			1e+6,
 			10,
 		},
+	}
+	for _, td := range testdata {
+		b.Run(td.name, func(b *testing.B) {
+			bin := New(td.options...)
+			babbler := babble.NewBabbler()
+			babbler.Separator = " "
+			babbler.Count = td.wordCount
+			for i := 0; i < td.indexSize; i++ {
+				bin.Index(babbler.Babble(), i)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				bin.Search("hello")
+			}
+		})
+	}
+}
+
+func BenchmarkFuzzySearch(b *testing.B) {
+	testdata := []struct {
+		name      string
+		options   []Option
+		distance  int
+		indexSize int
+		wordCount int
+	}{
 		{
-			"fuzzy",
-			[]Option{WithFuzzy(5)},
+			"basic",
+			[]Option{},
+			5,
 			1e+6,
 			10,
 		},
 		{
-			"all",
-			[]Option{WithStemming(), WithFuzzy(5)},
+			"stemming",
+			[]Option{WithStemming()},
+			5,
 			1e+6,
 			10,
 		},
@@ -244,7 +288,7 @@ func BenchmarkSearch(b *testing.B) {
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				bin.Search("hello")
+				bin.FuzzySearch("hello", td.distance)
 			}
 		})
 	}
