@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefaultIndex = "_default"
+	DefaultIndex = "default"
 )
 
 type Binocular struct {
@@ -33,14 +33,22 @@ func New(options ...Option) *Binocular {
 	for _, opt := range options {
 		opt(binocular)
 	}
-	// TODO IndexOptions?
-	binocular.indices[binocular.DefaultIndex] = NewIndex()
+	if _, ok := binocular.indices[DefaultIndex]; !ok {
+		binocular.indices[DefaultIndex] = NewIndex()
+	}
 	return binocular
 }
 
-func WithDefaultIndex(name string) Option {
+func WithDefaultIndex(name string, options ...IndexOption) Option {
 	return func(binocular *Binocular) {
 		binocular.DefaultIndex = name
+		binocular.indices[name] = NewIndex(options...)
+	}
+}
+
+func WithIndex(name string, options ...IndexOption) Option {
+	return func(binocular *Binocular) {
+		binocular.indices[name] = NewIndex(options...)
 	}
 }
 
