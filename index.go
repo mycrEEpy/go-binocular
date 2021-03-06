@@ -91,7 +91,7 @@ func (index *Index) search(word string) []string {
 	}
 	index.mut.RLock()
 	defer index.mut.RUnlock()
-	return index.data[searchWord]
+	return unique(index.data[searchWord])
 }
 
 // Search returns a slice of references found for the given word.
@@ -117,7 +117,7 @@ func (index *Index) Search(word string, distance int) []string {
 			refs = append(refs, v...)
 		}
 	}
-	return refs
+	return unique(refs)
 }
 
 // Remove deletes the reference from the Index.
@@ -192,4 +192,17 @@ func stripSpecialChars(s []byte) string {
 func removeElementFromSlice(s []string, i int) []string {
 	s[len(s)-1], s[i] = s[i], s[len(s)-1]
 	return s[:len(s)-1]
+}
+
+// deduplicate string slice
+func unique(in []string) []string {
+	keys := make(map[string]struct{})
+	list := make([]string, 0)
+	for _, entry := range in {
+		if _, value := keys[entry]; !value {
+			keys[entry] = struct{}{}
+			list = append(list, entry)
+		}
+	}
+	return list
 }

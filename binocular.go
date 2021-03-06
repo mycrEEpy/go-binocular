@@ -121,20 +121,24 @@ func (binocular *Binocular) Lookup(id string) (interface{}, bool) {
 	return doc.Data, true
 }
 
-func (binocular *Binocular) Search(word string, index string) []string {
+func (binocular *Binocular) Search(word string, index string) *SearchResult {
+	result := binocular.newSearchResult()
 	i, ok := binocular.indices[index]
 	if !ok {
-		return nil
+		return result
 	}
-	return i.Search(word, 0)
+	result.refs = i.Search(word, 0)
+	return result
 }
 
-func (binocular *Binocular) FuzzySearch(word string, index string, distance int) []string {
+func (binocular *Binocular) FuzzySearch(word string, index string, distance int) *SearchResult {
+	result := binocular.newSearchResult()
 	i, ok := binocular.indices[index]
 	if !ok {
-		return nil
+		return result
 	}
-	return i.Search(word, distance)
+	result.refs = i.Search(word, distance)
+	return result
 }
 
 func (binocular *Binocular) Remove(id string) {
@@ -146,4 +150,28 @@ func (binocular *Binocular) Remove(id string) {
 		binocular.indices[i].Remove(id)
 	}
 	delete(binocular.docs, id)
+}
+
+func (binocular *Binocular) newSearchResult() *SearchResult {
+	return &SearchResult{
+		binocular: binocular,
+		refs:      make([]string, 0),
+	}
+}
+
+type SearchResult struct {
+	binocular *Binocular
+	refs      []string
+}
+
+func (searchResult *SearchResult) Refs() []string {
+	return searchResult.refs
+}
+
+func (searchResult *SearchResult) Collect() []interface{} {
+	data := make([]interface{}, len(searchResult.refs))
+	for i, ref := range searchResult.refs {
+		data[i] = searchResult.binocular.Get(ref)
+	}
+	return data
 }
