@@ -7,6 +7,35 @@ Some sort of in-memory, record-level inverted index 🤷
 
 ## Example
 
+Using a `Binocular` instance:
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/mycreepy/go-binocular"
+)
+
+func main() {
+	b := binocular.New()
+	b.AddWithID("Always look on the bright side of life", "123")
+	b.AddWithID("Houston we have a problem", "456")
+	result, err := b.Search("life", binocular.DefaultIndex)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(result.Refs()) // ["123"]
+	data, err := result.Collect()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(data) // ["Always look on the bright side of life"]
+}
+```
+
+Just using a standalone `Index`:
+
 ```go
 package main
 
@@ -17,10 +46,10 @@ import (
 
 func main() {
 	index := binocular.NewIndex()
-	index.Put("Always look on the bright side of life", 123)
-	index.Put("Houston we have a problem", 456)
-	result := index.Search("life")
-	fmt.Println(result) // [123]
+	index.Add("Always look on the bright side of life", "123")
+	index.Add("Houston we have a problem", "456")
+	result := index.Search("life", 0)
+	fmt.Println(result) // ["123"]
 }
 ```
 
