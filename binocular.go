@@ -1,16 +1,24 @@
 package binocular
 
 import (
+	"errors"
 	"reflect"
 
 	"github.com/fatih/structtag"
 	"github.com/google/uuid"
 )
 
-const (
-	DefaultIndex = "default"
-)
+// DefaultIndex is the default Index when adding data to a Binocular.
+const DefaultIndex = "default"
 
+// ErrIndexNotFound indicates that the given index does not exist.
+var ErrIndexNotFound = errors.New("index not found")
+
+// ErrRefNotFound indicates that the given reference does not exist.
+var ErrRefNotFound = errors.New("ref not found")
+
+// Binocular holds you data and can use multiple Indices for searching it.
+// DefaultIndex is the currently configured default Index for the given Binocular instance.
 type Binocular struct {
 	docs         map[string]*document
 	indices      map[string]*Index
@@ -22,6 +30,7 @@ type document struct {
 	recordLocator map[string]struct{}
 }
 
+// Option can alter the behavior if a Binocular instance.
 type Option func(binocular *Binocular)
 
 func New(options ...Option) *Binocular {
@@ -39,6 +48,7 @@ func New(options ...Option) *Binocular {
 	return binocular
 }
 
+// WithDefaultIndex creates a new default Index with the given name and IndexOptions.
 func WithDefaultIndex(name string, options ...IndexOption) Option {
 	return func(binocular *Binocular) {
 		binocular.DefaultIndex = name
@@ -46,18 +56,21 @@ func WithDefaultIndex(name string, options ...IndexOption) Option {
 	}
 }
 
+// WithIndex creates a new Index with the given name and IndexOptions.
 func WithIndex(name string, options ...IndexOption) Option {
 	return func(binocular *Binocular) {
 		binocular.indices[name] = NewIndex(options...)
 	}
 }
 
+// Add will create a new id for your data and adds it to the Binocular instance.
 func (binocular *Binocular) Add(data interface{}) string {
 	id := uuid.New().String()
 	binocular.AddWithID(id, data)
 	return id
 }
 
+// AddWithID adds the data with the given id to the Binocular instance.
 func (binocular *Binocular) AddWithID(id string, data interface{}) {
 	doc := document{
 		Data:          data,
@@ -77,6 +90,85 @@ func (binocular *Binocular) AddWithID(id string, data interface{}) {
 	}
 }
 
+// Get will retrieve the data at the given id.
+// ErrRefNotFound is returned if the data does not exist.
+func (binocular *Binocular) Get(id string) (interface{}, error) {
+	doc, ok := binocular.docs[id]
+	if !ok {
+		return nil, ErrRefNotFound
+	}
+	return doc.Data, nil
+}
+
+// Search will search the given index with the given word and returns a SearchResult.
+// ErrIndexNotFound is returned if the given index does not exist.
+func (binocular *Binocular) Search(word string, index string) (*SearchResult, error) {
+	i, ok := binocular.indices[index]
+	if !ok {
+		return nil, ErrIndexNotFound
+	}
+	result := binocular.newSearchResult()
+	result.refs = i.Search(word, 0)
+	return result, nil
+}
+
+// FuzzySearch will use the distance to search the given index with the given word and returns a SearchResult.
+// ErrIndexNotFound is returned if the given index does not exist.
+func (binocular *Binocular) FuzzySearch(word string, index string, distance int) (*SearchResult, error) {
+	i, ok := binocular.indices[index]
+	if !ok {
+		return nil, ErrIndexNotFound
+	}
+	result := binocular.newSearchResult()
+	result.refs = i.Search(word, distance)
+	return result, nil
+}
+
+// Remove deletes the given id from all indices and the internal data map.
+// ErrRefNotFound is returned if the given id does not exist.
+func (binocular *Binocular) Remove(id string) error {
+	doc, ok := binocular.docs[id]
+	if !ok {
+		return ErrRefNotFound
+	}
+	for i := range doc.recordLocator {
+		binocular.indices[i].Remove(id)
+	}
+	delete(binocular.docs, id)
+	return nil
+}
+
+func (binocular *Binocular) newSearchResult() *SearchResult {
+	return &SearchResult{
+		binocular: binocular,
+	}
+}
+
+type SearchResult struct {
+	binocular *Binocular
+	refs      []string
+}
+
+// Refs returns the list of references found for your search.
+func (searchResult *SearchResult) Refs() []string {
+	return searchResult.refs
+}
+
+// Collect will use the found references and returns the data associated with it.
+// ErrRefNotFound is returned if a reference does not exist.
+func (searchResult *SearchResult) Collect() ([]interface{}, error) {
+	data := make([]interface{}, len(searchResult.refs))
+	for i, ref := range searchResult.refs {
+		doc, err := searchResult.binocular.Get(ref)
+		if err != nil {
+			return nil, ErrRefNotFound
+		}
+		data[i] = doc
+	}
+	return data, nil
+}
+
+// parses the given document for `binocular` tags and adds them to their respective Index.
 func (binocular *Binocular) parseStruct(id string, doc *document, t reflect.Type) {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -99,79 +191,4 @@ func (binocular *Binocular) parseStruct(id string, doc *document, t reflect.Type
 			binocular.parseStruct(id, doc, f.Type)
 		}
 	}
-}
-
-func (binocular *Binocular) Get(id string) interface{} {
-	doc, ok := binocular.docs[id]
-	if !ok {
-		return nil
-	}
-	return doc.Data
-}
-
-func (binocular *Binocular) Lookup(id string) (interface{}, bool) {
-	doc, ok := binocular.docs[id]
-	if !ok {
-		return nil, false
-	}
-	if doc.Data == nil {
-		// TODO garbage collection?
-		return nil, false
-	}
-	return doc.Data, true
-}
-
-func (binocular *Binocular) Search(word string, index string) *SearchResult {
-	result := binocular.newSearchResult()
-	i, ok := binocular.indices[index]
-	if !ok {
-		return result
-	}
-	result.refs = i.Search(word, 0)
-	return result
-}
-
-func (binocular *Binocular) FuzzySearch(word string, index string, distance int) *SearchResult {
-	result := binocular.newSearchResult()
-	i, ok := binocular.indices[index]
-	if !ok {
-		return result
-	}
-	result.refs = i.Search(word, distance)
-	return result
-}
-
-func (binocular *Binocular) Remove(id string) {
-	doc, ok := binocular.docs[id]
-	if !ok {
-		return
-	}
-	for i := range doc.recordLocator {
-		binocular.indices[i].Remove(id)
-	}
-	delete(binocular.docs, id)
-}
-
-func (binocular *Binocular) newSearchResult() *SearchResult {
-	return &SearchResult{
-		binocular: binocular,
-		refs:      make([]string, 0),
-	}
-}
-
-type SearchResult struct {
-	binocular *Binocular
-	refs      []string
-}
-
-func (searchResult *SearchResult) Refs() []string {
-	return searchResult.refs
-}
-
-func (searchResult *SearchResult) Collect() []interface{} {
-	data := make([]interface{}, len(searchResult.refs))
-	for i, ref := range searchResult.refs {
-		data[i] = searchResult.binocular.Get(ref)
-	}
-	return data
 }
