@@ -2,6 +2,7 @@ package binocular
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/tjarratt/babble"
@@ -121,14 +122,9 @@ func TestIndex_AddAndSearch(t *testing.T) {
 		t.Run(td.name, func(t *testing.T) {
 			index := NewIndex(td.options...)
 			for i, v := range td.indexData {
-				index.Add(v, i)
+				index.Add(v, strconv.Itoa(i))
 			}
-			var result []interface{}
-			if td.distance > 0 {
-				result = index.FuzzySearch(td.search, td.distance)
-			} else {
-				result = index.Search(td.search)
-			}
+			result := index.Search(td.search, td.distance)
 			if len(result) != td.lenRefs {
 				t.Errorf("expected %d, got %d", td.lenRefs, len(result))
 			}
@@ -139,17 +135,17 @@ func TestIndex_AddAndSearch(t *testing.T) {
 
 func TestIndex_Remove(t *testing.T) {
 	index := NewIndex()
-	index.Add("Some testing data", 1)
-	index.Remove(1)
-	r1 := index.Search("testing")
+	index.Add("Some testing data", "1")
+	index.Remove("1")
+	r1 := index.Search("testing", 0)
 	if len(r1) != 0 {
 		t.Errorf("result should be empty")
 	}
 
-	index.Add("Some testing data", 2)
-	index.Add("Some testing data", 3)
-	index.Remove(2)
-	r2 := index.Search("testing")
+	index.Add("Some testing data", "2")
+	index.Add("Some testing data", "3")
+	index.Remove("2")
+	r2 := index.Search("testing", 0)
 	if len(r2) != 1 {
 		t.Errorf("result should not be empty")
 	}
@@ -157,9 +153,9 @@ func TestIndex_Remove(t *testing.T) {
 
 func TestIndex_Drop(t *testing.T) {
 	index := NewIndex()
-	index.Add("Some testing data", 1)
+	index.Add("Some testing data", "1")
 	index.Drop()
-	result := index.Search("testing")
+	result := index.Search("testing", 0)
 	if len(result) != 0 {
 		t.Errorf("data should be empty")
 	}
@@ -211,7 +207,7 @@ func BenchmarkIndex_Add(b *testing.B) {
 			sentence := babbler.Babble()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				index.Add(sentence, i)
+				index.Add(sentence, strconv.Itoa(i))
 			}
 		})
 	}
@@ -244,11 +240,11 @@ func BenchmarkIndex_Search(b *testing.B) {
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				index.Add(babbler.Babble(), i)
+				index.Add(babbler.Babble(), strconv.Itoa(i))
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				index.Search("hello")
+				index.Search("hello", 0)
 			}
 		})
 	}
@@ -284,11 +280,11 @@ func BenchmarkIndex_FuzzySearch(b *testing.B) {
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				index.Add(babbler.Babble(), i)
+				index.Add(babbler.Babble(), strconv.Itoa(i))
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				index.FuzzySearch("hello", td.distance)
+				index.Search("hello", td.distance)
 			}
 		})
 	}
@@ -328,11 +324,11 @@ func BenchmarkIndex_Remove(b *testing.B) {
 			babbler.Separator = " "
 			babbler.Count = td.wordCount
 			for i := 0; i < td.indexSize; i++ {
-				index.Add(babbler.Babble(), i)
+				index.Add(babbler.Babble(), strconv.Itoa(i))
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				index.Remove(b.N)
+				index.Remove(strconv.Itoa(b.N))
 			}
 		})
 	}

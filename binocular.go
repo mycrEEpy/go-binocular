@@ -33,6 +33,7 @@ type document struct {
 // Option can alter the behavior if a Binocular instance.
 type Option func(binocular *Binocular)
 
+// New will create a new Binocular instance with the given Options.
 func New(options ...Option) *Binocular {
 	binocular := &Binocular{
 		docs:         map[string]*document{},
@@ -144,6 +145,7 @@ func (binocular *Binocular) newSearchResult() *SearchResult {
 	}
 }
 
+// SearchResult holds the resulting references of your search.
 type SearchResult struct {
 	binocular *Binocular
 	refs      []string
