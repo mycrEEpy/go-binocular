@@ -12,12 +12,12 @@ const (
 )
 
 type Binocular struct {
-	docs         map[string]*Document
+	docs         map[string]*document
 	indices      map[string]*Index
 	DefaultIndex string
 }
 
-type Document struct {
+type document struct {
 	Data          interface{}
 	recordLocator map[string]struct{}
 }
@@ -26,7 +26,7 @@ type Option func(binocular *Binocular)
 
 func New(options ...Option) *Binocular {
 	binocular := &Binocular{
-		docs:         map[string]*Document{},
+		docs:         map[string]*document{},
 		indices:      map[string]*Index{},
 		DefaultIndex: DefaultIndex,
 	}
@@ -52,14 +52,17 @@ func WithIndex(name string, options ...IndexOption) Option {
 	}
 }
 
-func (binocular *Binocular) Add(doc Document) string {
+func (binocular *Binocular) Add(data interface{}) string {
 	id := uuid.New().String()
-	binocular.AddWithID(id, doc)
+	binocular.AddWithID(id, data)
 	return id
 }
 
-func (binocular *Binocular) AddWithID(id string, doc Document) {
-	doc.recordLocator = make(map[string]struct{})
+func (binocular *Binocular) AddWithID(id string, data interface{}) {
+	doc := document{
+		Data:          data,
+		recordLocator: make(map[string]struct{}),
+	}
 	binocular.docs[id] = &doc
 
 	switch v := doc.Data.(type) {
@@ -74,7 +77,7 @@ func (binocular *Binocular) AddWithID(id string, doc Document) {
 	}
 }
 
-func (binocular *Binocular) parseStruct(id string, doc *Document, t reflect.Type) {
+func (binocular *Binocular) parseStruct(id string, doc *document, t reflect.Type) {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		switch f.Type.Kind() {
@@ -118,7 +121,7 @@ func (binocular *Binocular) Lookup(id string) (interface{}, bool) {
 	return doc.Data, true
 }
 
-func (binocular *Binocular) Search(word string, index string) []interface{} {
+func (binocular *Binocular) Search(word string, index string) []string {
 	i, ok := binocular.indices[index]
 	if !ok {
 		return nil
@@ -126,7 +129,7 @@ func (binocular *Binocular) Search(word string, index string) []interface{} {
 	return i.Search(word, 0)
 }
 
-func (binocular *Binocular) FuzzySearch(word string, index string, distance int) []interface{} {
+func (binocular *Binocular) FuzzySearch(word string, index string, distance int) []string {
 	i, ok := binocular.indices[index]
 	if !ok {
 		return nil

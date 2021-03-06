@@ -11,7 +11,7 @@ import (
 // Index is a thread-safe inverted index.
 type Index struct {
 	mut  sync.RWMutex
-	data map[string][]interface{}
+	data map[string][]string
 
 	stemming       bool
 	keepStopWords  bool
@@ -24,7 +24,7 @@ type IndexOption func(index *Index)
 // NewIndex creates a new Index with the given Options.
 func NewIndex(options ...IndexOption) *Index {
 	index := &Index{
-		data: map[string][]interface{}{},
+		data: make(map[string][]string),
 	}
 	for _, opt := range options {
 		opt(index)
@@ -55,7 +55,7 @@ func WithShortWords() IndexOption {
 }
 
 // Add splits the given sentence into words and adds them with the reference to the data map.
-func (index *Index) Add(sentence string, ref interface{}) {
+func (index *Index) Add(sentence string, ref string) {
 	for _, word := range strings.Split(sentence, " ") {
 		word = stripSpecialChars([]byte(word))
 		if index.stemming {
@@ -81,7 +81,7 @@ func (index *Index) Add(sentence string, ref interface{}) {
 }
 
 // search returns a slice of references found for the given word.
-func (index *Index) search(word string) []interface{} {
+func (index *Index) search(word string) []string {
 	searchWord := strings.ToLower(word)
 	if index.stemming {
 		stemmed, err := snowball.Stem(searchWord, "english", index.keepStopWords)
@@ -96,7 +96,7 @@ func (index *Index) search(word string) []interface{} {
 
 // Search returns a slice of references found for the given word.
 // Distance is the Levenshtein distance.
-func (index *Index) Search(word string, distance int) []interface{} {
+func (index *Index) Search(word string, distance int) []string {
 	if distance <= 0 {
 		return index.search(word)
 	}
@@ -110,7 +110,7 @@ func (index *Index) Search(word string, distance int) []interface{} {
 	}
 	index.mut.RLock()
 	defer index.mut.RUnlock()
-	refs := make([]interface{}, 0)
+	refs := make([]string, 0)
 	for k, v := range index.data {
 		d := fuzzy.RankMatch(searchWord, k)
 		if d > -1 && d <= distance {
@@ -121,7 +121,7 @@ func (index *Index) Search(word string, distance int) []interface{} {
 }
 
 // Remove deletes the reference from the Index.
-func (index *Index) Remove(ref interface{}) {
+func (index *Index) Remove(ref string) {
 	for word, refs := range index.data {
 		for i, refInIndex := range refs {
 			if refInIndex == ref {
@@ -145,7 +145,7 @@ func (index *Index) Remove(ref interface{}) {
 func (index *Index) Drop() {
 	index.mut.Lock()
 	defer index.mut.Unlock()
-	index.data = map[string][]interface{}{}
+	index.data = make(map[string][]string)
 }
 
 // copied from snowball package as it's unexported
@@ -189,7 +189,7 @@ func stripSpecialChars(s []byte) string {
 
 // swap the given data with the last element in the slice and drop it
 // copied from https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
-func removeElementFromSlice(s []interface{}, i int) []interface{} {
+func removeElementFromSlice(s []string, i int) []string {
 	s[len(s)-1], s[i] = s[i], s[len(s)-1]
 	return s[:len(s)-1]
 }
