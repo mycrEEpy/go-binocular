@@ -1,195 +1,197 @@
 package binocular
 
 import (
-	"strings"
-	"sync"
+	"errors"
+	"reflect"
 
-	"github.com/kljensen/snowball"
-	"github.com/lithammer/fuzzysearch/fuzzy"
+	"github.com/fatih/structtag"
+	"github.com/google/uuid"
 )
 
-// Binocular has a thread-safe inverted index
-type Binocular struct {
-	mut   sync.RWMutex
-	index map[string][]interface{}
+// DefaultIndex is the default Index when adding data to a Binocular.
+const DefaultIndex = "default"
 
-	stemming        bool
-	indexStopWords  bool
-	indexShortWords bool
+// ErrIndexNotFound indicates that the given index does not exist.
+var ErrIndexNotFound = errors.New("index not found")
+
+// ErrRefNotFound indicates that the given reference does not exist.
+var ErrRefNotFound = errors.New("ref not found")
+
+// Binocular holds you data and can use multiple Indices for searching it.
+// DefaultIndex is the currently configured default Index for the given Binocular instance.
+type Binocular struct {
+	docs         map[string]*document
+	indices      map[string]*Index
+	DefaultIndex string
 }
 
-// Option alters the behavior of a Binocular
-type Option func(b *Binocular)
+type document struct {
+	Data          interface{}
+	recordLocator map[string]struct{}
+}
 
-// New creates a new Binocular with the given Options
+// Option can alter the behavior if a Binocular instance.
+type Option func(binocular *Binocular)
+
+// New will create a new Binocular instance with the given Options.
 func New(options ...Option) *Binocular {
-	b := &Binocular{
-		index: map[string][]interface{}{},
+	binocular := &Binocular{
+		docs:         map[string]*document{},
+		indices:      map[string]*Index{},
+		DefaultIndex: DefaultIndex,
 	}
 	for _, opt := range options {
-		opt(b)
+		opt(binocular)
 	}
-	return b
+	if _, ok := binocular.indices[binocular.DefaultIndex]; !ok {
+		binocular.indices[DefaultIndex] = NewIndex()
+	}
+	return binocular
 }
 
-// WithStemming enables word stemming when calling Binocular.Index
-func WithStemming() Option {
-	return func(b *Binocular) {
-		b.stemming = true
-	}
-}
-
-// WithIndexStopWords enables indexing of stop words
-func WithIndexStopWords() Option {
-	return func(b *Binocular) {
-		b.indexStopWords = true
+// WithDefaultIndex creates a new default Index with the given name and IndexOptions.
+func WithDefaultIndex(name string, options ...IndexOption) Option {
+	return func(binocular *Binocular) {
+		binocular.DefaultIndex = name
+		binocular.indices[name] = NewIndex(options...)
 	}
 }
 
-// WithIndexShortWords enables indexing of short words
-// This will have no effect if WithStemming is also enabled
-func WithIndexShortWords() Option {
-	return func(b *Binocular) {
-		b.indexShortWords = true
+// WithIndex creates a new Index with the given name and IndexOptions.
+func WithIndex(name string, options ...IndexOption) Option {
+	return func(binocular *Binocular) {
+		binocular.indices[name] = NewIndex(options...)
 	}
 }
 
-// Index splits the given sentence into words and adds them with the reference to the index
-func (b *Binocular) Index(sentence string, ref interface{}) {
-	for _, word := range strings.Split(sentence, " ") {
-		word = stripSpecialChars([]byte(word))
-		if b.stemming {
-			stemmed, err := snowball.Stem(word, "english", b.indexStopWords)
-			if err == nil {
-				b.mut.Lock()
-				b.index[stemmed] = append(b.index[stemmed], ref)
-				b.mut.Unlock()
-				continue
+// Add will create a new id for your data and adds it to the Binocular instance.
+func (binocular *Binocular) Add(data interface{}) string {
+	id := uuid.New().String()
+	binocular.AddWithID(id, data)
+	return id
+}
+
+// AddWithID adds the data with the given id to the Binocular instance.
+func (binocular *Binocular) AddWithID(id string, data interface{}) {
+	doc := document{
+		Data:          data,
+		recordLocator: make(map[string]struct{}),
+	}
+	binocular.docs[id] = &doc
+
+	switch v := doc.Data.(type) {
+	case string:
+		binocular.indices[binocular.DefaultIndex].Add(v, id)
+		doc.recordLocator[binocular.DefaultIndex] = struct{}{}
+	default:
+		t := reflect.TypeOf(doc.Data)
+		if t.Kind() == reflect.Struct {
+			binocular.parseStruct(id, &doc, t)
+		}
+	}
+}
+
+// Get will retrieve the data at the given id.
+// ErrRefNotFound is returned if the data does not exist.
+func (binocular *Binocular) Get(id string) (interface{}, error) {
+	doc, ok := binocular.docs[id]
+	if !ok {
+		return nil, ErrRefNotFound
+	}
+	return doc.Data, nil
+}
+
+// Search will search the given index with the given word and returns a SearchResult.
+// ErrIndexNotFound is returned if the given index does not exist.
+func (binocular *Binocular) Search(word string, index string) (*SearchResult, error) {
+	i, ok := binocular.indices[index]
+	if !ok {
+		return nil, ErrIndexNotFound
+	}
+	result := binocular.newSearchResult()
+	result.refs = i.Search(word, 0)
+	return result, nil
+}
+
+// FuzzySearch will use the distance to search the given index with the given word and returns a SearchResult.
+// ErrIndexNotFound is returned if the given index does not exist.
+func (binocular *Binocular) FuzzySearch(word string, index string, distance int) (*SearchResult, error) {
+	i, ok := binocular.indices[index]
+	if !ok {
+		return nil, ErrIndexNotFound
+	}
+	result := binocular.newSearchResult()
+	result.refs = i.Search(word, distance)
+	return result, nil
+}
+
+// Remove deletes the given id from all indices and the internal data map.
+// ErrRefNotFound is returned if the given id does not exist.
+func (binocular *Binocular) Remove(id string) error {
+	doc, ok := binocular.docs[id]
+	if !ok {
+		return ErrRefNotFound
+	}
+	for i := range doc.recordLocator {
+		binocular.indices[i].Remove(id)
+	}
+	delete(binocular.docs, id)
+	return nil
+}
+
+func (binocular *Binocular) newSearchResult() *SearchResult {
+	return &SearchResult{
+		binocular: binocular,
+	}
+}
+
+// SearchResult holds the resulting references of your search.
+type SearchResult struct {
+	binocular *Binocular
+	refs      []string
+}
+
+// Refs returns the list of references found for your search.
+func (searchResult *SearchResult) Refs() []string {
+	return searchResult.refs
+}
+
+// Collect will use the found references and returns the data associated with it.
+// ErrRefNotFound is returned if a reference does not exist.
+func (searchResult *SearchResult) Collect() ([]interface{}, error) {
+	data := make([]interface{}, len(searchResult.refs))
+	for i, ref := range searchResult.refs {
+		doc, err := searchResult.binocular.Get(ref)
+		if err != nil {
+			return nil, ErrRefNotFound
+		}
+		data[i] = doc
+	}
+	return data, nil
+}
+
+// parses the given document for `binocular` tags and adds them to their respective Index.
+func (binocular *Binocular) parseStruct(id string, doc *document, t reflect.Type) {
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		switch f.Type.Kind() {
+		case reflect.String:
+			tags, err := structtag.Parse(string(f.Tag))
+			if err != nil {
+				break
 			}
-		}
-		wordLower := strings.ToLower(word)
-		if !b.indexShortWords && len(wordLower) <= 2 {
-			continue
-		}
-		if !b.indexStopWords && isStopWord(wordLower) {
-			continue
-		}
-		b.mut.Lock()
-		b.index[wordLower] = append(b.index[wordLower], ref)
-		b.mut.Unlock()
-	}
-}
-
-// Search returns a slice of references found for the given word
-func (b *Binocular) Search(word string) []interface{} {
-	searchWord := strings.ToLower(word)
-	if b.stemming {
-		stemmed, err := snowball.Stem(searchWord, "english", b.indexStopWords)
-		if err == nil {
-			searchWord = stemmed
-		}
-	}
-	b.mut.RLock()
-	defer b.mut.RUnlock()
-	return b.index[searchWord]
-}
-
-// FuzzySearch returns a slice of references found for the given word
-// distance is the Levenshtein distance and should be > 0
-func (b *Binocular) FuzzySearch(word string, distance int) []interface{} {
-	if distance <= 0 {
-		return b.Search(word)
-	}
-
-	searchWord := strings.ToLower(word)
-	if b.stemming {
-		stemmed, err := snowball.Stem(searchWord, "english", b.indexStopWords)
-		if err == nil {
-			searchWord = stemmed
-		}
-	}
-	b.mut.RLock()
-	defer b.mut.RUnlock()
-	refs := make([]interface{}, 0)
-	for k, v := range b.index {
-		d := fuzzy.RankMatch(searchWord, k)
-		if d > -1 && d <= distance {
-			refs = append(refs, v...)
-		}
-	}
-	return refs
-}
-
-// Remove deletes the reference from the index
-func (b *Binocular) Remove(ref interface{}) {
-	for word, refs := range b.index {
-		for i, refInIndex := range refs {
-			if refInIndex == ref {
-				// if it's the last ref just delete the entry
-				if len(refs) == 1 {
-					b.mut.Lock()
-					delete(b.index, word)
-					b.mut.Unlock()
-					continue
-				}
-				// otherwise create a new slice of refs without the given ref
-				b.mut.Lock()
-				b.index[word] = removeElementFromSlice(refs, i)
-				b.mut.Unlock()
+			bt, err := tags.Get("binocular")
+			if err != nil {
+				break
 			}
+			if _, ok := binocular.indices[bt.Name]; !ok {
+				binocular.indices[bt.Name] = NewIndex()
+			}
+			val := reflect.ValueOf(doc.Data).Field(i).String()
+			binocular.indices[bt.Name].Add(val, id)
+			doc.recordLocator[bt.Name] = struct{}{}
+		case reflect.Struct:
+			binocular.parseStruct(id, doc, f.Type)
 		}
 	}
-}
-
-// Drop deletes the whole index
-func (b *Binocular) Drop() {
-	b.mut.Lock()
-	defer b.mut.Unlock()
-	b.index = map[string][]interface{}{}
-}
-
-// copied from snowball package as it's unexported
-func isStopWord(word string) bool {
-	switch word {
-	case "a", "about", "above", "after", "again", "against", "all", "am", "an",
-		"and", "any", "are", "as", "at", "be", "because", "been", "before",
-		"being", "below", "between", "both", "but", "by", "can", "did", "do",
-		"does", "doing", "don", "down", "during", "each", "few", "for", "from",
-		"further", "had", "has", "have", "having", "he", "her", "here", "hers",
-		"herself", "him", "himself", "his", "how", "i", "if", "in", "into", "is",
-		"it", "its", "itself", "just", "me", "more", "most", "my", "myself",
-		"no", "nor", "not", "now", "of", "off", "on", "once", "only", "or",
-		"other", "our", "ours", "ourselves", "out", "over", "own", "s", "same",
-		"she", "should", "so", "some", "such", "t", "than", "that", "the", "their",
-		"theirs", "them", "themselves", "then", "there", "these", "they",
-		"this", "those", "through", "to", "too", "under", "until", "up",
-		"very", "was", "we", "were", "what", "when", "where", "which", "while",
-		"who", "whom", "why", "will", "with", "you", "your", "yours", "yourself",
-		"yourselves":
-		return true
-	}
-	return false
-}
-
-// faster than using regex
-// copied from https://stackoverflow.com/questions/54461423/efficient-way-to-remove-all-non-alphanumeric-characters-from-large-text
-func stripSpecialChars(s []byte) string {
-	j := 0
-	for _, b := range s {
-		if ('a' <= b && b <= 'z') ||
-			('A' <= b && b <= 'Z') ||
-			('0' <= b && b <= '9') ||
-			b == ' ' {
-			s[j] = b
-			j++
-		}
-	}
-	return string(s[:j])
-}
-
-// swap the given index with the last element in the slice and drop it
-// copied from https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
-func removeElementFromSlice(s []interface{}, i int) []interface{} {
-	s[len(s)-1], s[i] = s[i], s[len(s)-1]
-	return s[:len(s)-1]
 }

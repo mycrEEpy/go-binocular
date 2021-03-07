@@ -1,339 +1,223 @@
 package binocular
 
-import (
-	"fmt"
-	"testing"
+import "testing"
 
-	"github.com/tjarratt/babble"
-)
-
-func TestIndexAndSearch(t *testing.T) {
-	testdata := []struct {
-		name     string
-		options  []Option
-		index    []string
-		search   string
-		distance int
-		lenRefs  int
-	}{
-		{
-			"basic",
-			[]Option{},
-			[]string{
-				"Basic testing",
-			},
-			"testing",
-			0,
-			1,
-		},
-		{
-			"stop word disabled",
-			[]Option{},
-			[]string{
-				"So testing some stop words",
-			},
-			"some",
-			0,
-			0,
-		},
-		{
-			"stop word enabled",
-			[]Option{WithIndexStopWords()},
-			[]string{
-				"So testing some stop words",
-			},
-			"some",
-			0,
-			1,
-		},
-		{
-			"short stop word enabled",
-			[]Option{WithIndexStopWords(), WithIndexShortWords()},
-			[]string{
-				"So testing some stop words",
-			},
-			"so",
-			0,
-			1,
-		},
-		{
-			"stemming enabled",
-			[]Option{WithStemming()},
-			[]string{
-				"There are too many cats!",
-			},
-			"cat",
-			0,
-			1,
-		},
-		{
-			"stemming enabled with simplification",
-			[]Option{WithStemming()},
-			[]string{
-				"There are too many cats!",
-			},
-			"many",
-			0,
-			1,
-		},
-		{
-			"stemming enabled with simplification as input",
-			[]Option{WithStemming()},
-			[]string{
-				"There are too many cats!",
-			},
-			"mani",
-			0,
-			1,
-		},
-		{
-			"fuzzy search disabled",
-			[]Option{},
-			[]string{
-				"Can we have a dog please?",
-			},
-			"pls",
-			0,
-			0,
-		},
-		{
-			"fuzzy search enabled",
-			[]Option{},
-			[]string{
-				"Can we have a dog please?",
-			},
-			"pls",
-			5,
-			1,
-		},
-		{
-			"fuzzy search and stemming enabled",
-			[]Option{WithStemming()},
-			[]string{
-				"Please check all the accumulators",
-			},
-			"accumulator",
-			5,
-			1,
-		},
+func TestWithDefaultIndex(t *testing.T) {
+	idxName := "new_default_idx"
+	b := New(WithDefaultIndex(idxName))
+	if b.indices[idxName] == nil {
+		t.Errorf("index %s should not be nil", idxName)
 	}
-	for _, td := range testdata {
-		t.Run(td.name, func(t *testing.T) {
-			b := New(td.options...)
-			for i, v := range td.index {
-				b.Index(v, i)
-			}
-			var result []interface{}
-			if td.distance > 0 {
-				result = b.FuzzySearch(td.search, td.distance)
-			} else {
-				result = b.Search(td.search)
-			}
-			if len(result) != td.lenRefs {
-				t.Errorf("expected %d, got %d", td.lenRefs, len(result))
-			}
-			fmt.Printf("%s: %v\n", td.name, result)
-		})
+	if b.indices[DefaultIndex] != nil {
+		t.Error("default index should be nil")
 	}
 }
 
-func TestRemove(t *testing.T) {
+func TestWithIndex(t *testing.T) {
+	idxName := "new_idx"
+	b := New(WithIndex(idxName))
+	if b.indices[idxName] == nil {
+		t.Errorf("index %s should not be nil", idxName)
+	}
+	if b.indices[DefaultIndex] == nil {
+		t.Error("default index should not be nil")
+	}
+}
+
+func TestBinocular_Add_String(t *testing.T) {
 	b := New()
-	b.Index("Some testing data", 1)
-	b.Remove(1)
-	r1 := b.Search("testing")
-	if len(r1) != 0 {
-		t.Errorf("result should be empty")
+	testdata := "testdata"
+	id := b.Add(testdata)
+	if b.docs[id].Data != testdata {
+		t.Errorf("wrong data")
 	}
-
-	b.Index("Some testing data", 2)
-	b.Index("Some testing data", 3)
-	b.Remove(2)
-	r2 := b.Search("testing")
-	if len(r2) != 1 {
-		t.Errorf("result should not be empty")
+	if b.indices[DefaultIndex].data[testdata][0] != id {
+		t.Errorf("wrong id")
 	}
 }
 
-func TestDrop(t *testing.T) {
+func TestBinocular_AddWithID_String(t *testing.T) {
 	b := New()
-	b.Index("Some testing data", 1)
-	b.Drop()
-	result := b.Search("testing")
-	if len(result) != 0 {
-		t.Errorf("index should be empty")
+	testdata := "testdata"
+	id := "123"
+	b.AddWithID(id, testdata)
+	if b.docs[id].Data != testdata {
+		t.Error("wrong data")
+	}
+	if b.indices[DefaultIndex].data[testdata][0] != id {
+		t.Error("wrong id")
 	}
 }
 
-func BenchmarkIndex(b *testing.B) {
-	testdata := []struct {
-		name      string
-		options   []Option
-		wordCount int
+func TestBinocular_Add_Struct(t *testing.T) {
+	b := New()
+	testdata := struct {
+		s1 string `binocular:"default"`
+		s2 string `binocular:"idx1"`
+		i1 int
+		x1 struct {
+			s3 string `binocular:"idx2"`
+			f1 float64
+			b1 bool
+		}
 	}{
-		{
-			"basic",
-			[]Option{},
-			10,
-		},
-		{
-			"short sentence",
-			[]Option{},
-			2,
-		},
-		{
-			"stemming",
-			[]Option{WithStemming()},
-			10,
-		},
-		{
-			"index stop words",
-			[]Option{WithIndexStopWords()},
-			10,
-		},
-		{
-			"index short words",
-			[]Option{WithIndexShortWords()},
-			10,
-		},
-		{
-			"all",
-			[]Option{WithStemming(), WithIndexShortWords(), WithIndexStopWords()},
-			10,
+		"test",
+		"idx1data",
+		123,
+		struct {
+			s3 string `binocular:"idx2"`
+			f1 float64
+			b1 bool
+		}{
+			"idx2data",
+			1.0,
+			true,
 		},
 	}
-	for _, td := range testdata {
-		bin := New(td.options...)
-		babbler := babble.NewBabbler()
-		babbler.Separator = " "
-		babbler.Count = td.wordCount
-		b.Run(td.name, func(b *testing.B) {
-			sentence := babbler.Babble()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				bin.Index(sentence, i)
-			}
-		})
+	id := b.Add(testdata)
+	if b.docs[id].Data != testdata {
+		t.Error("wrong data")
+	}
+	if b.indices[DefaultIndex].data["test"][0] != id {
+		t.Error("wrong id")
+	}
+	if b.indices["idx1"].data["idx1data"][0] != id {
+		t.Error("wrong id")
 	}
 }
 
-func BenchmarkSearch(b *testing.B) {
-	testdata := []struct {
-		name      string
-		options   []Option
-		indexSize int
-		wordCount int
-	}{
-		{
-			"basic",
-			[]Option{},
-			1e+6,
-			10,
-		},
-		{
-			"stemming",
-			[]Option{WithStemming()},
-			1e+6,
-			10,
-		},
+func TestBinocular_Get(t *testing.T) {
+	b := New()
+	testdata := "testdata"
+	id := b.Add(testdata)
+	data, err := b.Get(id)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
 	}
-	for _, td := range testdata {
-		b.Run(td.name, func(b *testing.B) {
-			bin := New(td.options...)
-			babbler := babble.NewBabbler()
-			babbler.Separator = " "
-			babbler.Count = td.wordCount
-			for i := 0; i < td.indexSize; i++ {
-				bin.Index(babbler.Babble(), i)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				bin.Search("hello")
-			}
-		})
+	if data != testdata {
+		t.Error("wrong data")
+	}
+	data, err = b.Get("unknown_id")
+	if err == nil {
+		t.Error("expected error but got nil")
+	}
+	if err != ErrRefNotFound {
+		t.Errorf("wrong error: %s", err)
+	}
+	if data != nil {
+		t.Error("data should have been nil")
 	}
 }
 
-func BenchmarkFuzzySearch(b *testing.B) {
-	testdata := []struct {
-		name      string
-		options   []Option
-		distance  int
-		indexSize int
-		wordCount int
-	}{
-		{
-			"basic",
-			[]Option{},
-			5,
-			1e+6,
-			10,
-		},
-		{
-			"stemming",
-			[]Option{WithStemming()},
-			5,
-			1e+6,
-			10,
-		},
+func TestBinocular_Remove(t *testing.T) {
+	b := New()
+	testdata := "testdata"
+	id := b.Add(testdata)
+	err := b.Remove(id)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
 	}
-	for _, td := range testdata {
-		b.Run(td.name, func(b *testing.B) {
-			bin := New(td.options...)
-			babbler := babble.NewBabbler()
-			babbler.Separator = " "
-			babbler.Count = td.wordCount
-			for i := 0; i < td.indexSize; i++ {
-				bin.Index(babbler.Babble(), i)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				bin.FuzzySearch("hello", td.distance)
-			}
-		})
+	if b.docs[id] != nil {
+		t.Error("document should not exist")
+	}
+	err = b.Remove("unknown_id")
+	if err == nil {
+		t.Error("expected error but got nil")
+	}
+	if err != ErrRefNotFound {
+		t.Errorf("wrong error: %s", err)
 	}
 }
 
-func BenchmarkRemove(b *testing.B) {
-	testdata := []struct {
-		name      string
-		indexSize int
-		wordCount int
-	}{
-		{
-			"index size 1e+6",
-			1e+6,
-			10,
-		},
-		{
-			"index size 1e+5",
-			1e+5,
-			10,
-		},
-		{
-			"index size 1e+4",
-			1e+4,
-			10,
-		},
-		{
-			"index size 1e+3",
-			1e+3,
-			10,
-		},
+func TestBinocular_Search(t *testing.T) {
+	b := New()
+	testdata := "Lorem ipsum dolor sit amet"
+	b.Add(testdata)
+	b.Add("consetetur sadipscing elitr")
+	result, err := b.Search("ipsum", DefaultIndex)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
 	}
-	for _, td := range testdata {
-		b.Run(td.name, func(b *testing.B) {
-			bin := New()
-			babbler := babble.NewBabbler()
-			babbler.Separator = " "
-			babbler.Count = td.wordCount
-			for i := 0; i < td.indexSize; i++ {
-				bin.Index(babbler.Babble(), i)
-			}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				bin.Remove(b.N)
-			}
-		})
+	if len(result.Refs()) != 1 {
+		t.Error("wrong result len")
+	}
+	data, err := result.Collect()
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if data[0] != testdata {
+		t.Error("wrong data")
+	}
+}
+
+func TestBinocular_FuzzySearch(t *testing.T) {
+	b := New()
+	testdata := "Lorem ipsum dolor sit amet"
+	b.Add(testdata)
+	b.Add("consetetur sadipscing elitr")
+	result, err := b.FuzzySearch("ipm", DefaultIndex, 3)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if len(result.Refs()) != 1 {
+		t.Error("wrong result len")
+	}
+	data, err := result.Collect()
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if data[0] != testdata {
+		t.Error("wrong data")
+	}
+}
+
+func TestBinocular_Search_IndexNotFound(t *testing.T) {
+	b := New()
+	result, err := b.Search("test", "unknown_idx")
+	if err == nil {
+		t.Error("expected error but got nil")
+	}
+	if err != ErrIndexNotFound {
+		t.Errorf("wrong error: %s", err)
+	}
+	if result != nil {
+		t.Error("result should be nil")
+	}
+}
+
+func TestBinocular_FuzzySearch_IndexNotFound(t *testing.T) {
+	b := New()
+	result, err := b.FuzzySearch("test", "unknown_idx", 3)
+	if err == nil {
+		t.Error("expected error but got nil")
+	}
+	if err != ErrIndexNotFound {
+		t.Errorf("wrong error: %s", err)
+	}
+	if result != nil {
+		t.Error("result should be nil")
+	}
+}
+
+func TestSearchResult_Collect_ErrRefNotFound(t *testing.T) {
+	b := New()
+	id := b.Add("testdata")
+	result, err := b.Search("testdata", DefaultIndex)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	err = b.Remove(id)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	data, err := result.Collect()
+	if err == nil {
+		t.Error("expected error but got nil")
+	}
+	if err != ErrRefNotFound {
+		t.Errorf("wrong error: %s", err)
+	}
+	if data != nil {
+		t.Error("data should be nil")
 	}
 }
