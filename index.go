@@ -82,26 +82,24 @@ func (index *Index) Add(sentence string, ref string) {
 
 // search returns a slice of references found for the given word.
 func (index *Index) search(word string) []string {
-	searchWord := strings.ToLower(word)
 	if index.stemming {
-		stemmed, err := snowball.Stem(searchWord, "english", index.keepStopWords)
+		stemmed, err := snowball.Stem(word, "english", index.keepStopWords)
 		if err == nil {
-			searchWord = stemmed
+			word = stemmed
 		}
 	}
 	index.mut.RLock()
 	defer index.mut.RUnlock()
-	return unique(index.data[searchWord])
+	return unique(index.data[word])
 }
 
 // Search returns a slice of references found for the given word.
 // Distance is the Levenshtein distance.
 func (index *Index) Search(word string, distance int) []string {
+	searchWord := stripSpecialChars([]byte(strings.ToLower(word)))
 	if distance <= 0 {
-		return index.search(word)
+		return index.search(searchWord)
 	}
-
-	searchWord := strings.ToLower(word)
 	if index.stemming {
 		stemmed, err := snowball.Stem(searchWord, "english", index.keepStopWords)
 		if err == nil {

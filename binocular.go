@@ -43,7 +43,7 @@ func New(options ...Option) *Binocular {
 	for _, opt := range options {
 		opt(binocular)
 	}
-	if _, ok := binocular.indices[DefaultIndex]; !ok {
+	if _, ok := binocular.indices[binocular.DefaultIndex]; !ok {
 		binocular.indices[DefaultIndex] = NewIndex()
 	}
 	return binocular
@@ -187,7 +187,8 @@ func (binocular *Binocular) parseStruct(id string, doc *document, t reflect.Type
 			if _, ok := binocular.indices[bt.Name]; !ok {
 				binocular.indices[bt.Name] = NewIndex()
 			}
-			binocular.indices[bt.Name].Add(reflect.ValueOf(doc.Data).Field(i).String(), id)
+			val := reflect.ValueOf(doc.Data).Field(i).String()
+			binocular.indices[bt.Name].Add(val, id)
 			doc.recordLocator[bt.Name] = struct{}{}
 		case reflect.Struct:
 			binocular.parseStruct(id, doc, f.Type)
