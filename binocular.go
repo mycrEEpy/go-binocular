@@ -192,14 +192,14 @@ func (binocular *Binocular) parseStruct(id string, doc *document, t reflect.Type
 					continue
 				}
 				s := reflect.ValueOf(f)
-				for j := 0; j < s.Len(); j++ {
+				for j := 0; j < f.Type.Len(); j++ {
 					val := reflect.ValueOf(s.Index(j)).Field(i).String()
 					binocular.indexString(id, bt.Name, val, doc)
 				}
 			case reflect.Struct:
 				s := reflect.ValueOf(f)
-				for j := 0; j < s.Len(); j++ {
-					binocular.parseStruct(id, doc, s.Type())
+				for j := 0; j < f.Type.Len(); j++ {
+					binocular.parseStruct(id, doc, s.Index(j).Type())
 				}
 			}
 		}
