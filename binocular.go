@@ -176,22 +176,52 @@ func (binocular *Binocular) parseStruct(id string, doc *document, t reflect.Type
 		f := t.Field(i)
 		switch f.Type.Kind() {
 		case reflect.String:
-			tags, err := structtag.Parse(string(f.Tag))
-			if err != nil {
-				break
-			}
-			bt, err := tags.Get("binocular")
-			if err != nil {
-				break
-			}
-			if _, ok := binocular.indices[bt.Name]; !ok {
-				binocular.indices[bt.Name] = NewIndex()
+			bt := parseBinocularFieldTag(f.Tag)
+			if bt == nil {
+				continue
 			}
 			val := reflect.ValueOf(doc.Data).Field(i).String()
-			binocular.indices[bt.Name].Add(val, id)
-			doc.recordLocator[bt.Name] = struct{}{}
+			binocular.indexString(id, bt.Name, val, doc)
 		case reflect.Struct:
 			binocular.parseStruct(id, doc, f.Type)
+		case reflect.Slice:
+			switch f.Type.Elem().Kind() {
+			case reflect.String:
+				bt := parseBinocularFieldTag(f.Tag)
+				if bt == nil {
+					continue
+				}
+				s := reflect.ValueOf(f)
+				for j := 0; j < s.Len(); j++ {
+					val := reflect.ValueOf(s.Index(j)).Field(i).String()
+					binocular.indexString(id, bt.Name, val, doc)
+				}
+			case reflect.Struct:
+				s := reflect.ValueOf(f)
+				for j := 0; j < s.Len(); j++ {
+					binocular.parseStruct(id, doc, s.Type())
+				}
+			}
 		}
 	}
+}
+
+func parseBinocularFieldTag(tag reflect.StructTag) *structtag.Tag {
+	tags, err := structtag.Parse(string(tag))
+	if err != nil {
+		return nil
+	}
+	bt, err := tags.Get("binocular")
+	if err != nil {
+		return nil
+	}
+	return bt
+}
+
+func (binocular *Binocular) indexString(id, indexName, data string, doc *document) {
+	if _, ok := binocular.indices[indexName]; !ok {
+		binocular.indices[indexName] = NewIndex()
+	}
+	binocular.indices[indexName].Add(data, id)
+	doc.recordLocator[indexName] = struct{}{}
 }
