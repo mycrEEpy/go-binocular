@@ -6,7 +6,7 @@ require (
 	github.com/fatih/structtag v1.2.0
 	github.com/google/uuid v1.3.0
 	github.com/kljensen/snowball v0.8.0
-	github.com/lithammer/fuzzysearch v1.1.6
+	github.com/lithammer/fuzzysearch v1.1.7
 	github.com/tjarratt/babble v0.0.0-20210505082055-cbca2a4833c1
 )
 
