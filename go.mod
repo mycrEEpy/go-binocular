@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/fatih/structtag v1.2.0
 	github.com/google/uuid v1.6.0
-	github.com/kljensen/snowball v0.9.0
+	github.com/kljensen/snowball v0.10.0
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/tjarratt/babble v0.0.0-20210505082055-cbca2a4833c1
 )
